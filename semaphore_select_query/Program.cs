@@ -3,44 +3,53 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 
 string connString = @"Server=DESKTOP-TO8EGSF;Database=books;Trusted_Connection=True;Encrypt=False;";
-Semaphore semaphore = new Semaphore(5, 5);
+string query = @"SELECT * FROM users;";
 
-for (int i = 1; i <= 50; ++i) 
+Semaphore semaphore = new Semaphore(0, 5);
+object consoleLock = new object();
+
+for (int i = 1; i <= 90; ++i)
 {
-    int n = 1;
-    Thread t = new Thread(RunSelectQuery);
+    int n = i;
+    Thread t = new Thread(() => RunSelectQuery(n));
     t.Start();
 }
 
-void RunSelectQuery() 
+Thread.Sleep(5000);
+semaphore.Release(5);
+
+void RunSelectQuery(int id) 
 {
+    Console.WriteLine($"Thread {id} started");
+    semaphore.WaitOne();
+
     using (SqlConnection conn = new SqlConnection(connString))
     {
         try
         {
             conn.Open();
 
-            string query = @"SELECT * FROM users;";
+            SqlDataAdapter adapter = new SqlDataAdapter(query, conn);
+            DataSet dataSet = new DataSet();
 
-            SqlCommand cmd = new SqlCommand()
-            {
-                Connection = conn,
-                CommandType = CommandType.Text,
-                CommandText = query
-            };
+            adapter.Fill(dataSet);
 
-            SqlDataReader reader = cmd.ExecuteReader();
-
-            DataTable dt = new DataTable();
-            dt.Load(reader);
-
-            foreach (DataRow dr in dt.Rows)
-            {
-                foreach (DataColumn dc in dt.Columns)
+            lock (consoleLock) 
+            { 
+                foreach (DataTable dt in dataSet.Tables) 
                 {
-                    Console.Write(dr[dc] + " ");
+                    Console.WriteLine(dt.TableName);
+                    foreach (DataColumn col in dt.Columns)
+                        Console.Write($"\t{col.ColumnName}");
+                    Console.WriteLine("\n");
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        var cells = row.ItemArray;
+                        foreach(object cell in cells)
+                            Console.Write("\t{0}", cell);
+                        Console.WriteLine();
+                    }
                 }
-                Console.WriteLine();
             }
         }
         catch (Exception ex)
@@ -53,4 +62,5 @@ void RunSelectQuery()
                 conn.Close();
         }
     }
+    semaphore.Release();
 }
