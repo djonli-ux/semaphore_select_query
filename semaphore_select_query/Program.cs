@@ -45,7 +45,7 @@ void RunSelectQuery(int id)
                     foreach (DataRow row in dt.Rows)
                     {
                         var cells = row.ItemArray;
-                        foreach(object cell in cells)
+                        foreach(object? cell in cells)
                             Console.Write("\t{0}", cell);
                         Console.WriteLine();
                     }
